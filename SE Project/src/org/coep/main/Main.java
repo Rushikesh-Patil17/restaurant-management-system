@@ -24,7 +24,6 @@ import com.formdev.flatlaf.FlatLightLaf;
 
 class LoginPage extends JFrame implements ActionListener {
 	private static final long serialVersionUID = 1L;
-
 	JLabel heading1, heading2, heading3, login, loginhead, pass;
 	JTextField logint;
 	JPasswordField passt;
@@ -40,8 +39,8 @@ class LoginPage extends JFrame implements ActionListener {
 		setLayout(null);
 		setTitle("Fast Food Restaurent Management System");
 		f = new Font("Liberation Sans", Font.PLAIN, 25);
-		
-		URL url = this.getClass().getResource("/pizza.jpg");		
+
+		URL url = this.getClass().getResource("/pizza.jpg");
 		setContentPane(new JLabel(new ImageIcon(url)));
 
 		heading1 = new JLabel("Fast Food ");
@@ -66,19 +65,19 @@ class LoginPage extends JFrame implements ActionListener {
 		passt.addActionListener(this);
 
 		this.addWindowListener(new WindowAdapter() {
-		    public void windowClosing(WindowEvent evt) {
-		        int resp = JOptionPane.showConfirmDialog(null, "Are you sure you want to exit?",
-		            "Exit?", JOptionPane.YES_NO_OPTION);
+			public void windowClosing(WindowEvent evt) {
+				int resp = JOptionPane.showConfirmDialog(null, "Are you sure you want to exit?", "Exit?",
+						JOptionPane.YES_NO_OPTION);
 
-		        if (resp == JOptionPane.YES_OPTION) {
-		            setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		            System.exit(0);
-		        } else {
-		            setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-		        }
-		    }
+				if (resp == JOptionPane.YES_OPTION) {
+					setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+					System.exit(0);
+				} else {
+					setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+				}
+			}
 		});
-		
+
 		setVisible(true);
 	}
 
@@ -94,7 +93,7 @@ class LoginPage extends JFrame implements ActionListener {
 				passt.requestFocus();
 			}
 		} else if (ae.getSource() == passt) {
-			if (x == "") {
+			if (x.equals("")) {
 				JOptionPane.showMessageDialog(null, "Invalid Password!");
 				passt.requestFocus();
 			} else {
@@ -169,13 +168,12 @@ class LoginPage extends JFrame implements ActionListener {
 class Main {
 	public static void main(String args[]) {
 		// set up look and feel
-
 		try {
 			UIManager.setLookAndFeel(new FlatLightLaf());
 		} catch (Exception ex) {
 			System.err.println("Failed to initialize LaF");
 		}
-		
+
 		new MenuClass();
 		new LoginPage(new MenuClass());
 	}
