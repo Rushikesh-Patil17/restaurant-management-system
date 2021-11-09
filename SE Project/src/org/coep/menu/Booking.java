@@ -4,10 +4,20 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.LocalDate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
@@ -16,6 +26,8 @@ import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SpinnerModel;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 
 import com.github.lgooddatepicker.components.DatePicker;
@@ -33,6 +45,8 @@ public class Booking extends JPanel implements ActionListener {
 	JButton deleteBooking;
 	DatePicker datePicker;
 	MenuClass parent;
+	boolean isBookingEditing = false;
+	static int bookingId = -1;
 	
 	public Booking(MenuClass parent) {
 		this.parent = parent;
@@ -73,6 +87,41 @@ public class Booking extends JPanel implements ActionListener {
 		
 		scrBooking = new JScrollPane(tblBooking, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
 				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
+		tblBooking.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+			public void valueChanged(ListSelectionEvent event) {
+				if (tblBooking.getSelectedRow() != -1) {
+					// enable deleteItem button
+					deleteBooking.setEnabled(true);
+				} else {
+					// otherwise disable deleteItem button
+					deleteBooking.setEnabled(false);
+				}
+			}
+		});
+
+		tblBooking.addMouseListener(new MouseAdapter() {
+			public void mouseClicked(MouseEvent me) {
+				if (me.getClickCount() == 2) {
+					isBookingEditing = true;
+					int row = tblBooking.getSelectedRow(); // select a row
+
+					// populate data
+					bookingId = (int) tblBooking.getValueAt(row, 0);
+					String name = tblBooking.getValueAt(row, 1).toString();
+					String date = tblBooking.getValueAt(row, 2).toString();
+					String mobile = tblBooking.getValueAt(row, 3).toString();
+					String email = tblBooking.getValueAt(row, 4).toString();
+					int people = (int) tblBooking.getValueAt(row, 5);
+
+					tname.setText(name);
+					datePicker.setText(date);
+					tphone.setText(mobile);
+					temail.setText(email);
+					noOfPeople.setValue(people);
+				}
+			}
+		});
 		
 		SpinnerModel v = new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1);
 		noOfPeople.setModel(v);
@@ -143,7 +192,6 @@ public class Booking extends JPanel implements ActionListener {
 		tphone.setBounds(150, 250, 250, 40);
 		noOfPeople.setBounds(150, 350, 100, 40);
 		datePicker.setBounds(150, 450, 250, 30);
-		scrBooking.setBounds(420, 50, 580, 500);
 	}
 
 	public void setMyFont() {
@@ -164,6 +212,177 @@ public class Booking extends JPanel implements ActionListener {
 	}
 
 	public void actionPerformed(ActionEvent ae) {
-		// TODO: Handle callbacks
+		// Callback for <Book> -> <Book>
+		if (ae.getSource() == bookBook) {
+			String name = tname.getText().trim();
+			String mobile = tphone.getText().trim();
+			String email = temail.getText().trim();
+			boolean isValid = true;
+
+			// validations for name field
+			Pattern namePattern = Pattern.compile("^[A-Za-z]+([\\ A-Za-z]+)*");
+			Matcher nameMatcher = namePattern.matcher(name);
+
+			// validations for mobile no. field
+			Pattern mobilePattern = Pattern.compile("^[789]\\d{9}$");
+			Matcher mobileMatcher = mobilePattern.matcher(mobile);
+
+			// validations for email field
+			Pattern emailPattern = Pattern.compile("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$");
+			Matcher emaileMatcher = emailPattern.matcher(email);
+
+			// check for customer name
+			if (name.isEmpty() || (!nameMatcher.matches())) {
+				JOptionPane.showMessageDialog(parent, "Inavlid Name!!");
+				isValid = false;
+			}
+
+			// check for mobile no.
+			if (mobile.isEmpty() || (!mobileMatcher.matches())) {
+				JOptionPane.showMessageDialog(parent, "Inavlid Mobile Number!!");
+				isValid = false;
+			}
+
+			// check for email
+			if (email.isEmpty() || (!emaileMatcher.matches())) {
+				JOptionPane.showMessageDialog(parent, "Inavlid Email Address!!");
+				isValid = false;
+			}
+
+			if (datePicker.getText().trim().isEmpty()) {
+				JOptionPane.showMessageDialog(parent, "No Date Selected!!");
+				isValid = false;
+			}
+
+			String url = "jdbc:sqlite::resource:FastFoodDB.db";
+
+			if (isValid) {
+				try {
+					Class.forName("org.sqlite.JDBC");
+					Connection con = DriverManager.getConnection(url);
+					Statement st = con.createStatement();
+
+					if (isBookingEditing) {
+						String cmd = "update booking set booking_name = ?, booking_mobile = ?, booking_date = ?, booking_email = ?, booking_quantity = ? where _id = ?";
+						PreparedStatement statement = con.prepareStatement(cmd);
+
+						statement.setString(1, name);
+						statement.setString(2, mobile);
+						statement.setString(3, datePicker.getText());
+						statement.setString(4, email);
+						statement.setInt(5, (int) noOfPeople.getValue());
+						statement.setInt(6, bookingId);
+
+						statement.execute();
+						((DefaultTableModel) tblBooking.getModel()).setRowCount(0);
+						addBookings();
+						isBookingEditing = false;
+						JOptionPane.showMessageDialog(parent, "Booking Updated Successfully!!");
+						con.close();
+					}
+
+					else {
+						String x1 = "INSERT INTO booking (booking_name, booking_mobile, booking_date, booking_email, booking_quantity)"
+								+ " VALUES('" + name + "','" + mobile + "','" + datePicker.getText() + "','" + email
+								+ "'," + ((int) noOfPeople.getValue()) + ")";
+
+						st.execute(x1);
+
+						((DefaultTableModel) tblBooking.getModel()).setRowCount(0);
+						addBookings();
+
+						JOptionPane.showMessageDialog(parent, "Booking Done Successfully!!");
+
+						con.close();
+					}
+
+					tname.setText("");
+					tphone.setText("");
+					datePicker.clear();
+					temail.setText("");
+					noOfPeople.setValue(1);
+				}
+
+				catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+		if (ae.getSource() == deleteBooking) {
+			int booking = (int) tblBooking.getValueAt(tblBooking.getSelectedRow(), 0);
+			
+			if (booking != -1) {
+				// don't edit and delete simultaneously
+				if (booking == bookingId) {
+					tname.setText("");
+					tphone.setText("");
+					datePicker.clear();
+					temail.setText("");
+					noOfPeople.setValue(1);
+					isBookingEditing = false;
+				}
+				
+				// delete the selected row
+				String url = "jdbc:sqlite::resource:FastFoodDB.db";
+
+				try {
+					Class.forName("org.sqlite.JDBC");
+					Connection con = DriverManager.getConnection(url);
+					PreparedStatement statement = con.prepareStatement("delete from booking where _id = ?");
+
+					statement.setInt(1, booking);
+					statement.executeUpdate();
+
+					((DefaultTableModel) tblBooking.getModel()).setRowCount(0);
+					addBookings();
+
+					JOptionPane.showMessageDialog(parent, "Booking Deleted Successfully!", "",
+							JOptionPane.INFORMATION_MESSAGE);
+
+					con.close();
+				}
+
+				catch (Exception ex) {
+					JOptionPane.showMessageDialog(parent, "Could not delete booking!", "", JOptionPane.ERROR_MESSAGE);
+					ex.printStackTrace();
+				}
+			}
+		}
+
+		if (ae.getSource() == bookCancel) {
+			tname.setText("");
+			tphone.setText("");
+			datePicker.clear();
+			temail.setText("");
+			noOfPeople.setValue(1);
+			isBookingEditing = false;
+		}
+	}
+
+	public void addBookings() {
+		String url = "jdbc:sqlite::resource:FastFoodDB.db";
+
+		try {
+			Class.forName("org.sqlite.JDBC");
+			Connection con = DriverManager.getConnection(url);
+			Statement st = con.createStatement();
+			String x = "SELECT * FROM booking";
+			ResultSet rs = st.executeQuery(x);
+
+			while (rs.next()) {
+				((DefaultTableModel) tblBooking.getModel()).addRow(new Object[] { rs.getInt(1), rs.getString(2),
+						rs.getString(3), rs.getString(4), rs.getString(5), rs.getInt(6) });
+			}
+			con.close();
+		}
+
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		scrBooking.setBounds(420, 50, 580, 500);
+		this.add(scrBooking);
 	}
 }
+
