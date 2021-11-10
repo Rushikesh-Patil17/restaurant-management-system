@@ -13,6 +13,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.table.DefaultTableModel;
 
 public class MenuClass extends JFrame implements ActionListener {
 	private static final long serialVersionUID = 1L;
@@ -24,6 +25,7 @@ public class MenuClass extends JFrame implements ActionListener {
 	JLabel icon, fast, res;
 	Font font;
 	JButton menu, book, order, logout, manageOrders;
+	static int amt = 0;
 	
 	public MenuClass() {
 		setLocation(200, 200);
@@ -81,6 +83,7 @@ public class MenuClass extends JFrame implements ActionListener {
 		viewOrdersPanel.setVisible(false);
 		setVisible(false);
 		menuPanel.setVisible(true);
+		menuPanel.refreshMenu(0);
 	}
 
 	public void setMyColor() {
@@ -193,6 +196,8 @@ public class MenuClass extends JFrame implements ActionListener {
 			orderPanel.setVisible(false);
 			viewOrdersPanel.setVisible(false);
 			selectMenu(book);
+			((DefaultTableModel) bookPanel.tblBooking.getModel()).setRowCount(0);
+			bookPanel.addBookings();
 		}
 		
 		else if (ae.getSource() == manageOrders) {
@@ -200,6 +205,7 @@ public class MenuClass extends JFrame implements ActionListener {
 			bookPanel.setVisible(false);
 			orderPanel.setVisible(false);
 			viewOrdersPanel.setVisible(true);
+			viewOrdersPanel.refreshOrders();
 			selectMenu(manageOrders);
 		}
 	}

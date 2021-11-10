@@ -4,9 +4,29 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
@@ -14,6 +34,10 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.SpinnerModel;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 
 public class Order extends JPanel implements ActionListener{
@@ -25,6 +49,13 @@ public class Order extends JPanel implements ActionListener{
 	JSpinner quantitySpinner;
 	JScrollPane scrBill;
 	JTable billTable;
+	static int amount = 0;
+	boolean isEditing = false;
+	static int toBeUpdated = -1;
+	
+	// map to store menu items id and quantity
+	LinkedHashMap<Integer, Integer[]> map = new LinkedHashMap<Integer, Integer[]>();
+
 	
 	public Order() {
 		this.setLayout(null);
@@ -80,6 +111,19 @@ public class Order extends JPanel implements ActionListener{
 			}
 
 		};
+
+		billTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+			public void valueChanged(ListSelectionEvent event) {
+				if (billTable.getSelectedRow() != -1 && billTable.getSelectedRow() != (billTable.getRowCount() - 1)
+						&& billTable.getSelectedRow() != (billTable.getRowCount() - 2)) {
+					// enable deleteItem button
+					deleteItem.setEnabled(true);
+				} else {
+					// otherwise disable deleteItem button
+					deleteItem.setEnabled(false);
+				}
+			}
+		});
 
 		billTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		billTable.setModel(model);
@@ -199,8 +243,319 @@ public class Order extends JPanel implements ActionListener{
 		add.setFont(new Font("Liberation Sans", Font.PLAIN, 20));
 		bill.setFont(new Font("Liberation Sans", Font.PLAIN, 20));
 	}
-
-	public void actionPerformed(ActionEvent ae) {
 	
+	public void handleMenu(int type) {
+		orderCombo.setEnabled(true);
+
+		String url = "jdbc:sqlite::resource:FastFoodDB.db";
+		String x = "SELECT * FROM menu_item WHERE item_type = " + type;
+
+		orderCombo.removeAllItems();
+
+		try {
+			Class.forName("org.sqlite.JDBC");
+			Connection con = DriverManager.getConnection(url);
+			Statement st = con.createStatement();
+
+			ResultSet rs = st.executeQuery(x);
+
+			while (rs.next()) {
+				if (rs.getInt(5) == 0)
+					continue;
+				orderCombo.addItem(rs.getString(2));
+			}
+			con.close();
+		}
+
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void actionPerformed(ActionEvent ae) {
+		// Callback for <Order> -> <Veg Menu>
+		if (ae.getSource() == veg)
+			handleMenu(0);
+
+		// Callback for <Order> -> <NonVeg Menu>
+		else if (ae.getSource() == nonveg)
+			handleMenu(1);
+
+		// Callback for <Order> -> <Dessert Menu>
+		else if (ae.getSource() == dessert)
+			handleMenu(2);
+		
+		// Callback for <Order> -> <Drinks Menu>
+		else if (ae.getSource() == drinks)
+			handleMenu(3);
+
+		// Callback for <Order> -> <Add>
+		else if (ae.getSource() == add) {
+			String y = quantitySpinner.getValue().toString();
+			int q = Integer.parseInt(y);
+			String n = (String) orderCombo.getSelectedItem();
+
+			String url = "jdbc:sqlite::resource:FastFoodDB.db";
+			String x = "SELECT * FROM menu_item WHERE item_name = '" + n + "'";
+
+			try {
+				Class.forName("org.sqlite.JDBC");
+				Connection con = DriverManager.getConnection(url);
+				Statement st = con.createStatement();
+				ResultSet rs = st.executeQuery(x);
+
+				if (rs.next()) {
+					int id = rs.getInt("item_id");
+					int price = rs.getInt("item_price");
+
+					// add the entry in hash map
+					map.put(id, new Integer[] { q, price });
+
+					refreshBill();
+					tb.setText(String.valueOf(amount));
+					deleteItem.setVisible(true);
+					clearAll.setVisible(true);
+				}
+				con.close();
+			}
+
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		// Callback for <Order> -> <Bill>
+		else if (ae.getSource() == bill) {
+			String name = tm.getText().trim();
+			String mobile = tc.getText().trim();
+			boolean isValid = true;
+
+			// validations for name field
+			Pattern namePattern = Pattern.compile("^[A-Za-z]+([\\ A-Za-z]+)*");
+			Matcher nameMatcher = namePattern.matcher(name);
+
+			// validations for mobile no. field
+			Pattern mobilePattern = Pattern.compile("^[789]\\d{9}$");
+			Matcher mobileMatcher = mobilePattern.matcher(mobile);
+
+			// check for customer name
+			if (name.isEmpty() || (!nameMatcher.matches())) {
+				JOptionPane.showMessageDialog(null, "Inavlid Name!!");
+				isValid = false;
+			}
+
+			// check for mobile no.
+			if (mobile.isEmpty() || (!mobileMatcher.matches())) {
+				JOptionPane.showMessageDialog(null, "Inavlid Mobile Number!!");
+				isValid = false;
+			}
+
+			// check if any items are selected or not
+			if (billTable.getRowCount() == 0) {
+				JOptionPane.showMessageDialog(null, "No Items Selected!!");
+				isValid = false;
+			}
+
+			if (isValid) {
+				tb.setText(String.valueOf(amount));
+				String url = "jdbc:sqlite::resource:FastFoodDB.db";
+				SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+
+				try {
+					Class.forName("org.sqlite.JDBC");
+					Connection con = DriverManager.getConnection(url);
+
+					String cmd = "INSERT INTO food_order(order_name, order_date, order_mobile, order_bill, items) values(?, ?, ?, ?, ?)";
+					String cmd1 = "UPDATE food_order SET order_name = ?, order_mobile = ?, order_bill = ?, items = ? WHERE _id = ?";
+
+					PreparedStatement statement = con.prepareStatement(cmd);
+					byte[] buffer = makebyte(map);
+
+					PreparedStatement statement1 = con.prepareStatement(cmd1);
+
+					if (isEditing) {
+						statement1.setString(1, tm.getText());
+						statement1.setString(2, tc.getText());
+						statement1.setInt(3, amount);
+						statement1.setBytes(4, buffer);
+						statement1.setInt(5, toBeUpdated);
+
+						statement1.execute();
+						// clear map
+						map.clear();
+
+						JOptionPane.showMessageDialog(null, "Order Updated Successfully!!");
+						isEditing = false;
+						con.close();
+					}
+
+					else {
+						statement.setString(1, tm.getText());
+						statement.setString(2, String.valueOf(formatter.format(new Date())));
+						statement.setString(3, tc.getText());
+						statement.setInt(4, amount);
+						statement.setBytes(5, buffer);
+
+						statement.execute();
+
+						// clear map
+						map.clear();
+
+						JOptionPane.showMessageDialog(null, "Order Saved Successfully!!");
+						con.close();
+					}
+				}
+
+				catch (Exception e) {
+					e.printStackTrace();
+				}
+
+				tm.setText("");
+				tc.setText("");
+				tb.setText("");
+				amount = 0;
+				DefaultTableModel dtm = (DefaultTableModel) billTable.getModel();
+				dtm.setRowCount(0);
+			}
+		}
+
+		else if (ae.getSource() == orderCombo) {
+			quantitySpinner.setEnabled(true);
+			SpinnerModel value = new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1);
+			quantitySpinner.setModel(value);
+		}
+		
+		if (ae.getSource() == deleteItem) {
+			if (billTable.getRowCount() != 0) {
+				((DefaultTableModel) billTable.getModel()).removeRow(billTable.getRowCount() - 1);
+				((DefaultTableModel) billTable.getModel()).removeRow(billTable.getRowCount() - 1);
+			}
+
+			// delete the ordered items in the billing table
+			map.remove(billTable.getValueAt(billTable.getSelectedRow(), 0));
+			((DefaultTableModel) billTable.getModel()).removeRow(billTable.getSelectedRow());
+
+			if (billTable.getRowCount() == 0) {
+				// if no items are present empty the table
+				DefaultTableModel dtm = (DefaultTableModel) billTable.getModel();
+				dtm.setRowCount(0);
+				amount = 0;
+				tb.setText("");
+			}
+
+			else {
+				calculateTotal();
+
+				// add a separator row and grand total row
+				((DefaultTableModel) billTable.getModel()).addRow(new Object[] { "", "", "", "", "" });
+				((DefaultTableModel) billTable.getModel()).addRow(new Object[] { "Grand Total", "", "", "", amount });
+
+				// change grand total value
+				billTable.setValueAt(amount, billTable.getRowCount() - 1, 4);
+			}
+		}
+
+		if (ae.getSource() == clearAll)
+			clearOrderEditing();
+	}
+
+	public void refreshBill() {
+		// remove all rows
+		((DefaultTableModel) billTable.getModel()).setRowCount(0);
+
+		// populate using map
+		Set set = map.entrySet();
+		Iterator iterator = set.iterator();
+
+		String url = "jdbc:sqlite::resource:FastFoodDB.db";
+
+		try {
+			Class.forName("org.sqlite.JDBC");
+			Connection con = DriverManager.getConnection(url);
+			String sql = "SELECT * FROM menu_item WHERE item_id = ?";
+
+			PreparedStatement statement = con.prepareStatement(sql);
+
+			while (iterator.hasNext()) {
+				Map.Entry me = (Map.Entry) iterator.next();
+				statement.setInt(1, (int) me.getKey());
+
+				ResultSet rs = statement.executeQuery();
+
+				((DefaultTableModel) billTable.getModel())
+						.addRow(new Object[] { rs.getInt(1), rs.getString(2), ((Integer[]) me.getValue())[0],
+								rs.getInt(3), ((Integer[]) me.getValue())[0] * ((Integer[]) me.getValue())[1] });
+			}
+
+			calculateTotal();
+
+			// add a separator row and grand total row
+			((DefaultTableModel) billTable.getModel()).addRow(new Object[] { "", "", "", "", "" });
+			((DefaultTableModel) billTable.getModel()).addRow(new Object[] { "Grand Total", "", "", "", amount });
+
+			con.close();
+		}
+
+		catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		scrBill.setBounds(510, 150, 500, 400);
+		this.add(scrBill);
+	}
+	
+	public void calculateTotal() {
+		amount = 0;
+		// traverse the table and save sum to amt
+		if (billTable.getRowCount() != 0) {
+			for (int i = 0; i < billTable.getRowCount(); i++) {
+				amount = amount + (int) billTable.getValueAt(i, 4);
+			}
+
+			tb.setText(Integer.toString(amount));
+		}
+	}
+
+	// serialize the map
+	public static byte[] makebyte(LinkedHashMap<Integer, Integer[]> modeldata) {
+		try {
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			ObjectOutputStream oos = new ObjectOutputStream(baos);
+			oos.writeObject(modeldata);
+			byte[] employeeAsBytes = baos.toByteArray();
+			ByteArrayInputStream bais = new ByteArrayInputStream(employeeAsBytes);
+			return employeeAsBytes;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+
+	// deserialize the map
+	public static LinkedHashMap<Integer, Integer[]> read(byte[] data) {
+		try {
+			ByteArrayInputStream baip = new ByteArrayInputStream(data);
+			ObjectInputStream ois = new ObjectInputStream(baip);
+			LinkedHashMap<Integer, Integer[]> dataobj = (LinkedHashMap<Integer, Integer[]>) ois.readObject();
+			return dataobj;
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	void clearOrderEditing() {
+		map.clear();
+		tm.setText("");
+		tc.setText("");
+		tb.setText("");
+		amount = 0;
+		DefaultTableModel dtm = (DefaultTableModel) billTable.getModel();
+		dtm.setRowCount(0);
+		isEditing = false;
 	}
 }
