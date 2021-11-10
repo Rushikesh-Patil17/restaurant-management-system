@@ -385,4 +385,3 @@ public class Booking extends JPanel implements ActionListener {
 		this.add(scrBooking);
 	}
 }
-
