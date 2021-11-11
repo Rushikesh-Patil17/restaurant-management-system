@@ -38,7 +38,7 @@ public class MenuClass extends JFrame implements ActionListener {
 		upPanel = new JPanel();
 		upPanel.setLayout(null);
 		menuPanel = new Menu(this);
-		orderPanel = new Order();
+		orderPanel = new Order(this);
 		viewOrdersPanel = new ManageOrders(this, orderPanel);
 		bookPanel = new Booking(this);
 		sepPanel = new JPanel();

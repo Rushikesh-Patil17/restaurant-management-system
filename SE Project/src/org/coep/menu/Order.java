@@ -20,8 +20,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -40,6 +38,9 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 
+import org.coep.objects.OrderClass;
+import org.coep.testtool.OrderValidator;
+
 public class Order extends JPanel implements ActionListener{
 	private static final long serialVersionUID = 1L;
 	JButton veg, nonveg, dessert, drinks, bill, add, deleteItem, clearAll;
@@ -52,13 +53,15 @@ public class Order extends JPanel implements ActionListener{
 	static int amount = 0;
 	boolean isEditing = false;
 	static int toBeUpdated = -1;
+	MenuClass parent;
 	
 	// map to store menu items id and quantity
 	LinkedHashMap<Integer, Integer[]> map = new LinkedHashMap<Integer, Integer[]>();
 
 	
-	public Order() {
+	public Order(MenuClass parent) {
 		this.setLayout(null);
+		this.parent = parent;
 		
 		deleteItem = new JButton("Delete");
 		clearAll = new JButton("Clear All");
@@ -328,34 +331,11 @@ public class Order extends JPanel implements ActionListener{
 		else if (ae.getSource() == bill) {
 			String name = tm.getText().trim();
 			String mobile = tc.getText().trim();
-			boolean isValid = true;
 
-			// validations for name field
-			Pattern namePattern = Pattern.compile("^[A-Za-z]+([\\ A-Za-z]+)*");
-			Matcher nameMatcher = namePattern.matcher(name);
-
-			// validations for mobile no. field
-			Pattern mobilePattern = Pattern.compile("^[789]\\d{9}$");
-			Matcher mobileMatcher = mobilePattern.matcher(mobile);
-
-			// check for customer name
-			if (name.isEmpty() || (!nameMatcher.matches())) {
-				JOptionPane.showMessageDialog(null, "Inavlid Name!!");
-				isValid = false;
-			}
-
-			// check for mobile no.
-			if (mobile.isEmpty() || (!mobileMatcher.matches())) {
-				JOptionPane.showMessageDialog(null, "Inavlid Mobile Number!!");
-				isValid = false;
-			}
-
-			// check if any items are selected or not
-			if (billTable.getRowCount() == 0) {
-				JOptionPane.showMessageDialog(null, "No Items Selected!!");
-				isValid = false;
-			}
-
+			OrderClass order = new OrderClass(name, mobile, billTable.getRowCount());
+			boolean isValid = new OrderValidator(order, this.parent).isValid();
+			
+			
 			if (isValid) {
 				tb.setText(String.valueOf(amount));
 				String url = "jdbc:sqlite::resource:FastFoodDB.db";
