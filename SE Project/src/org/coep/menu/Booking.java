@@ -12,8 +12,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -30,11 +28,14 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 
+import org.coep.objects.BookingClass;
+import org.coep.testtool.BookingValidator;
+
 import com.github.lgooddatepicker.components.DatePicker;
 import com.github.lgooddatepicker.components.DatePickerSettings;
 
 public class Booking extends JPanel implements ActionListener {
-	
+
 	private static final long serialVersionUID = 1L;
 	JScrollPane scrBooking;
 	JButton bookBook, bookDelete, bookCancel;
@@ -47,11 +48,11 @@ public class Booking extends JPanel implements ActionListener {
 	MenuClass parent;
 	boolean isBookingEditing = false;
 	static int bookingId = -1;
-	
+
 	public Booking(MenuClass parent) {
 		this.parent = parent;
 		this.setLayout(null);
-		setLayout(null);		
+		setLayout(null);
 		deleteBooking = new JButton("Delete");
 
 		bookName = new JLabel("Name");
@@ -74,7 +75,7 @@ public class Booking extends JPanel implements ActionListener {
 		deleteBooking.addActionListener(this);
 
 		tblBooking = new JTable();
-		
+
 		DefaultTableModel modelBooking = new DefaultTableModel(new Object[] { "Booking ID", "Booker Name",
 				"Booking Date", "Booking Mobile", "Booking Email", "No. of People" }, 0) {
 			private static final long serialVersionUID = 1L;
@@ -84,7 +85,7 @@ public class Booking extends JPanel implements ActionListener {
 				return false;
 			}
 		};
-		
+
 		scrBooking = new JScrollPane(tblBooking, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
 				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
@@ -122,7 +123,7 @@ public class Booking extends JPanel implements ActionListener {
 				}
 			}
 		});
-		
+
 		SpinnerModel v = new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1);
 		noOfPeople.setModel(v);
 
@@ -134,9 +135,9 @@ public class Booking extends JPanel implements ActionListener {
 		datePickerSettings.setDateRangeLimits(LocalDate.now(), LocalDate.now().plusDays(365));
 		datePickerSettings.setAllowKeyboardEditing(false);
 		datePickerSettings.setFormatForDatesCommonEra("dd/MM/yyyy, EEE");
-			
+
 		tblBooking.setModel(modelBooking);
-		
+
 		setMyColor();
 		addMe();
 		setMyPosition();
@@ -158,7 +159,7 @@ public class Booking extends JPanel implements ActionListener {
 		bookDelete.setBackground(new Color(255, 0, 0));
 	}
 
-	public void addMe() {		
+	public void addMe() {
 		this.add(bookName);
 		this.add(bookEmail);
 		this.add(bookPhone);
@@ -217,43 +218,10 @@ public class Booking extends JPanel implements ActionListener {
 			String name = tname.getText().trim();
 			String mobile = tphone.getText().trim();
 			String email = temail.getText().trim();
-			boolean isValid = true;
-
-			// validations for name field
-			Pattern namePattern = Pattern.compile("^[A-Za-z]+([\\ A-Za-z]+)*");
-			Matcher nameMatcher = namePattern.matcher(name);
-
-			// validations for mobile no. field
-			Pattern mobilePattern = Pattern.compile("^[789]\\d{9}$");
-			Matcher mobileMatcher = mobilePattern.matcher(mobile);
-
-			// validations for email field
-			Pattern emailPattern = Pattern.compile("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$");
-			Matcher emaileMatcher = emailPattern.matcher(email);
-
-			// check for customer name
-			if (name.isEmpty() || (!nameMatcher.matches())) {
-				JOptionPane.showMessageDialog(parent, "Inavlid Name!!");
-				isValid = false;
-			}
-
-			// check for mobile no.
-			if (mobile.isEmpty() || (!mobileMatcher.matches())) {
-				JOptionPane.showMessageDialog(parent, "Inavlid Mobile Number!!");
-				isValid = false;
-			}
-
-			// check for email
-			if (email.isEmpty() || (!emaileMatcher.matches())) {
-				JOptionPane.showMessageDialog(parent, "Inavlid Email Address!!");
-				isValid = false;
-			}
-
-			if (datePicker.getText().trim().isEmpty()) {
-				JOptionPane.showMessageDialog(parent, "No Date Selected!!");
-				isValid = false;
-			}
-
+			
+			BookingClass booking = new BookingClass(name, mobile, email, email);
+			boolean isValid = new BookingValidator(booking, this.parent).isValid();
+			
 			String url = "jdbc:sqlite::resource:FastFoodDB.db";
 
 			if (isValid) {
@@ -311,7 +279,7 @@ public class Booking extends JPanel implements ActionListener {
 
 		if (ae.getSource() == deleteBooking) {
 			int booking = (int) tblBooking.getValueAt(tblBooking.getSelectedRow(), 0);
-			
+
 			if (booking != -1) {
 				// don't edit and delete simultaneously
 				if (booking == bookingId) {
@@ -322,7 +290,7 @@ public class Booking extends JPanel implements ActionListener {
 					noOfPeople.setValue(1);
 					isBookingEditing = false;
 				}
-				
+
 				// delete the selected row
 				String url = "jdbc:sqlite::resource:FastFoodDB.db";
 
